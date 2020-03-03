@@ -17,13 +17,41 @@ pub fn main() {
 
 
 	let d = grid.new_leaf(Props::sized(1.0, 2.0));
+
 	let parent = grid.new_node(lines! {
 			d parent;
+			d parent;
+			d parent;
+			d parent;
+			d parent;
+			d parent;
 		}).unwrap();
+
+//	d a a;
+//	d a a;
+//	d b c;
+//	d b c;
+//	d b c;
+//	d b c;
+
+//	a a;
+//	b c;
+//	b c;
 
 //	d a a
 //	d b c
 //	d b c
 
 	grid.compute_layout(parent).unwrap();
+
+	let layout = grid.layout(parent).unwrap();
+	println!("{:?}", layout);
+
+	let mut buffer = String::new();
+
+	for node in grid.children(parent).unwrap() {
+
+		
+
+	}
 }

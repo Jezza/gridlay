@@ -120,6 +120,15 @@ impl GridLay {
 		Ok(node)
 	}
 
+	pub fn children(&self, node: Node) -> Result<Vec<Node>, Error> {
+		let id = self.find_node(node)?;
+		Ok(self.forest.children[id].iter().map(|child| self.ids_to_nodes[child]).collect())
+	}
+
+	pub fn child_count(&self, node: Node) -> Result<usize, Error> {
+		let id = self.find_node(node)?;
+		Ok(self.forest.children[id].len())
+	}
 
 	pub fn layout(&self, node: Node) -> Result<&Layout, Error> {
 		let id = self.find_node(node)?;
@@ -210,21 +219,21 @@ impl StateMachine {
 		Ok(())
 	}
 
-	fn size(&self) -> (Number, Number) {
+	fn size(&self) -> (usize, usize) {
 //		println!("end = {:#?}", self);
 		match self {
 			StateMachine::Start => unreachable!(),
 			StateMachine::FirstRow {
 				count
 			} => {
-				(*count as f32, 1.0)
+				(*count, 1)
 			},
 			StateMachine::Rest {
 				width,
 				count,
 				height,
 			} => {
-				(*width as Number, *height as Number)
+				(*width, *height)
 			}
 		}
 	}
@@ -282,24 +291,17 @@ impl Lines<'_> {
 
 		Template {
 			data,
-			size: Size::new(Unit::Defined(width), Unit::Defined(height))
+			size: (width, height)
 		}
 	}
 }
 
 pub struct Template {
 	data: Vec<NodeId>,
-	size: Size,
+	size: (usize, usize),
 }
 
 impl Template {
-	fn new() -> Self {
-		Template {
-			data: vec![],
-			size: Size::new(Unit::Undefined, Unit::Undefined),
-		}
-	}
-
 	fn ids(&self) -> Vec<NodeId> {
 		let mut children: Vec<NodeId> = self.data.clone();
 
@@ -310,27 +312,92 @@ impl Template {
 	}
 
 	fn get(&self, x: usize, y: usize) -> Option<&NodeId> {
-		use geo::OrElse;
-
-		let width = self.size.width.or_else(0.0) as usize;
+		let width = self.size.0 as usize;
 
 		let index = x + y * width;
 		dbg!(index);
 		self.data.get(index)
 	}
 
-	fn iter(&self) -> impl Iterator<Item = (Point, NodeId)> {
-		let x: Number = 0.0;
-		let y: Number = 0.0;
+	fn iter(&self) -> Result<impl Iterator<Item = (Layout, NodeId)>, Error> {
 
-		println!("{}", self.get(0, 0).unwrap());
-		println!("{}", self.get(1, 0).unwrap());
-		println!("{}", self.get(0, 1).unwrap());
-		println!("{}", self.get(1, 1).unwrap());
-		println!("{}", self.get(2, 1).unwrap());
+		let (width, height) = self.size;
 
-		todo!();
+		let len = width * height;
 
-		vec![].into_iter()
+		let mut index = 0;
+		let mut points = vec![];
+		let mut bit_mask = vec![false; len];
+		let mut seen = vec![];
+
+		macro_rules! point {
+			($index:ident) => {{
+				let x = $index % width;
+				let y = $index / width;
+				(x, y)
+			}};
+		}
+
+		while index < len {
+			if bit_mask[index] {
+				index += 1;
+				continue;
+			}
+			let node = self.data.get(index)
+				.unwrap();
+
+			if seen.contains(node) {
+				return Err(Error(format!("Invalid character at {:?}. [Forms invalid shape: {:?}]", point!(index), node)))
+			}
+
+			let rect_width = {
+				let mut rect_width = width;
+				for offset in 1..width {
+					let right = index + offset;
+
+					if right >= len || self.data.get(right).unwrap() != node {
+						rect_width = offset;
+						break;
+					}
+				};
+				rect_width
+			};
+
+			let rect_height = {
+				let mut rect_height = height;
+				for offset in 1..height {
+					let below = index + (offset * width);
+
+					if below >= len || self.data.get(below).unwrap() != node {
+						rect_height = offset;
+						break;
+					}
+				}
+				rect_height
+			};
+
+			for y_offset in 0..rect_height {
+				for x_offset in 0..rect_width {
+					let bit_index = index + x_offset + (y_offset * width);
+					let at = self.data.get(bit_index).unwrap();
+					if at != node {
+						return Err(Error(format!("Invalid character at {:?}. [expected: {:?}, found: {:?}]", point!(bit_index), node, at)))
+					}
+					bit_mask[bit_index] = true;
+				}
+			}
+
+			let (x, y) = point!(index);
+
+			let mut layout = Layout::new();
+			layout.location = Point::new(Unit::Defined(x as f32), Unit::Defined(y as f32));
+			layout.size = Size::new(Unit::Defined(rect_width as f32), Unit::Defined(rect_height as f32));
+
+			seen.push(*node);
+
+			points.push((layout, *node));
+		}
+
+		Ok(points.into_iter())
 	}
 }

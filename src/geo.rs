@@ -1,5 +1,6 @@
 pub type Size = euclid::default::Size2D<Unit>;
 pub type Point = euclid::default::Point2D<Unit>;
+pub type Rect = euclid::default::Rect<Unit>;
 
 
 pub trait OrElse<T> {

@@ -1,5 +1,5 @@
 use crate::Error;
-use crate::geo::{Props, Point};
+use crate::geo::{Props, Point, OrElse};
 use crate::geo::Size;
 use crate::geo::Unit;
 use crate::geo::Layout;
@@ -10,7 +10,7 @@ use crate::NodeId;
 pub(crate) struct NodeData {
 	props: Props,
 	pub(crate) layout: Layout,
-	template: Template,
+	template: Option<Template>,
 	layout_cache: Option<Cache>,
 	is_dirty: bool,
 }
@@ -20,7 +20,7 @@ impl NodeData {
 		NodeData {
 			props,
 			layout: Layout::new(),
-			template: Template::new(),
+			template: None,
 			layout_cache: None,
 			is_dirty: true,
 		}
@@ -30,7 +30,7 @@ impl NodeData {
 		NodeData {
 			props,
 			layout: Layout::new(),
-			template,
+			template: Some(template),
 			layout_cache: None,
 			is_dirty: true,
 		}
@@ -190,7 +190,7 @@ impl Forest {
 
 impl Forest {
 	pub(crate) fn compute(&mut self, root: NodeId, size: Size, x: Number, y: Number) -> Result<(), Error> {
-		let root_node = &mut self.nodes[root];
+		let root_node = &self.nodes[root];
 		if let Some(cache) = &root_node.layout_cache {
 			return todo!();
 		}
@@ -205,7 +205,7 @@ impl Forest {
 				return Err(Error("Leaf node has no defined width.".into()));
 			}
 
-			root_node.layout = {
+			self.nodes[root].layout = {
 				let mut layout = Layout::new();
 				layout.size = root_node.props.size;
 				layout.location = Point::new(Unit::Defined(x), Unit::Defined(y));
@@ -215,15 +215,36 @@ impl Forest {
 			return Ok(());
 		}
 
-		let template = &root_node.template;
+		let template = root_node.template.as_ref().unwrap();
 
-		for (location, node_id) in template.iter() {
+		let mut width = 0 as Number;
+		let mut height = 0 as Number;
+
+		for (point, node_id) in template.iter()? {
+			let t = point.location;
+
+			println!("Child: {:?}", point);
+			let size = Size::new(Unit::Undefined, Unit::Undefined);
+
+			let x = x + t.x.or_else(0.0);
+			let y = y + t.y.or_else(0.0);
+
+			self.compute(node_id, size, x, y)?;
+			let layout = self.nodes[node_id].layout;
+			println!("Result: {:?}", layout);
+
+			width += layout.size.width.or_else(0f32);
+			height += layout.size.height.or_else(0f32);
 
 		}
 
-//		root_node.
-
-
+		self.nodes[root].layout = {
+			let mut layout = Layout::new();
+			layout.size = Size::new(Unit::Defined(width), Unit::Defined(height));
+			layout.location = Point::new(Unit::Defined(x), Unit::Defined(y));
+			println!("Nested: {:?}", layout);
+			layout
+		};
 
 
 		Ok(())

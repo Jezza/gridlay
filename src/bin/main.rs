@@ -12,20 +12,20 @@ pub fn main() {
 	let parent = grid.new_node(lines! {
 			a a;
 			b c;
-			b c;
+//			b c;
 		}).unwrap();
 
 
-	let d = grid.new_leaf(Props::sized(1.0, 2.0));
-
-	let parent = grid.new_node(lines! {
-			d parent;
-			d parent;
-			d parent;
-			d parent;
-			d parent;
-			d parent;
-		}).unwrap();
+//	let d = grid.new_leaf(Props::sized(1.0, 2.0));
+//
+//	let parent = grid.new_node(lines! {
+//			d parent;
+//			d parent;
+//			d parent;
+//			d parent;
+//			d parent;
+//			d parent;
+//		}).unwrap();
 
 //	d a a;
 //	d a a;
@@ -44,14 +44,11 @@ pub fn main() {
 
 	grid.compute_layout(parent).unwrap();
 
-	let layout = grid.layout(parent).unwrap();
-	println!("{:?}", layout);
-
-	let mut buffer = String::new();
-
-	for node in grid.children(parent).unwrap() {
-
-		
-
-	}
+//	let layout = grid.layout(parent).unwrap();
+//	println!("{:?}", layout);
+//
+//	let mut buffer = String::new();
+//
+//	for node in grid.children(parent).unwrap() {
+//	}
 }

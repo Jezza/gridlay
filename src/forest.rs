@@ -8,10 +8,10 @@ use crate::Template;
 use crate::NodeId;
 
 pub(crate) struct NodeData {
-	props: Props,
+	pub(crate) props: Props,
 	pub(crate) layout: Layout,
-	template: Option<Template>,
-	layout_cache: Option<Cache>,
+	pub(crate) template: Option<Template>,
+	pub(crate) layout_cache: Option<Cache>,
 	is_dirty: bool,
 }
 
@@ -37,7 +37,7 @@ impl NodeData {
 	}
 }
 
-struct Cache;
+pub(crate) struct Cache;
 
 pub(crate) struct Forest {
 	pub(crate) nodes: Vec<NodeData>,
@@ -190,24 +190,25 @@ impl Forest {
 
 impl Forest {
 	pub(crate) fn compute(&mut self, root: NodeId, size: Size, x: Number, y: Number) -> Result<(), Error> {
-		let root_node = &self.nodes[root];
-		if let Some(cache) = &root_node.layout_cache {
+		if let Some(cache) = &self.nodes[root].layout_cache {
 			return todo!();
 		}
 
 		let children = &self.children[root];
 
 		if children.is_empty() {
-			if root_node.props.size.height == Unit::Undefined {
+			let size = &self.nodes[root].props.size;
+
+			if size.height == Unit::Undefined {
 				return Err(Error("Leaf node has no defined height.".into()));
 			}
-			if root_node.props.size.width == Unit::Undefined {
+			if size.width == Unit::Undefined {
 				return Err(Error("Leaf node has no defined width.".into()));
 			}
 
 			self.nodes[root].layout = {
 				let mut layout = Layout::new();
-				layout.size = root_node.props.size;
+				layout.size = *size;
 				layout.location = Point::new(Unit::Defined(x), Unit::Defined(y));
 				layout
 			};
@@ -215,27 +216,26 @@ impl Forest {
 			return Ok(());
 		}
 
-		let template = root_node.template.as_ref().unwrap();
-
 		let mut width = 0 as Number;
 		let mut height = 0 as Number;
 
-		for (point, node_id) in template.iter()? {
-			let t = point.location;
+		for (rect, node_id) in self.nodes[root].template.as_ref().unwrap().iter()? {
 
-			println!("Child: {:?}", point);
-			let size = Size::new(Unit::Undefined, Unit::Undefined);
+			println!("Child: {:?}", rect);
+			let x = x + rect.location.x.or_else(0.0);
+			let y = y + rect.location.y.or_else(0.0);
 
-			let x = x + t.x.or_else(0.0);
-			let y = y + t.y.or_else(0.0);
+			let node_width = rect.size.width.or_else(0.0).max(self.nodes[node_id].props.size.width.or_else(0.0));
+			let node_height = rect.size.height.or_else(0.0).max(self.nodes[node_id].props.size.height.or_else(0.0));
+
+			let size = Size::new(Unit::Defined(node_width), Unit::Defined(node_height));
 
 			self.compute(node_id, size, x, y)?;
 			let layout = self.nodes[node_id].layout;
 			println!("Result: {:?}", layout);
 
-			width += layout.size.width.or_else(0f32);
-			height += layout.size.height.or_else(0f32);
-
+			width += node_width;
+			height += node_height;
 		}
 
 		self.nodes[root].layout = {

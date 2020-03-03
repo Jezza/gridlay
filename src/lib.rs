@@ -7,7 +7,6 @@ use lazy_static::lazy_static;
 
 use crate::forest::Forest;
 use crate::geo::Layout;
-use crate::geo::Number;
 use crate::geo::Point;
 use crate::geo::Props;
 use crate::geo::Size;
@@ -230,8 +229,8 @@ impl StateMachine {
 			},
 			StateMachine::Rest {
 				width,
-				count,
 				height,
+				..
 			} => {
 				(*width, *height)
 			}
@@ -309,14 +308,6 @@ impl Template {
 		children.dedup();
 
 		children
-	}
-
-	fn get(&self, x: usize, y: usize) -> Option<&NodeId> {
-		let width = self.size.0 as usize;
-
-		let index = x + y * width;
-		dbg!(index);
-		self.data.get(index)
 	}
 
 	fn iter(&self) -> Result<impl Iterator<Item = (Layout, NodeId)>, Error> {

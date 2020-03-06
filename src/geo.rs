@@ -1,7 +1,7 @@
 pub type Size = euclid::default::Size2D<Unit>;
 pub type Point = euclid::default::Point2D<Unit>;
 pub type Rect = euclid::default::Rect<Unit>;
-
+pub type Layout = Rect;
 
 pub trait OrElse<T> {
 	fn or_else(&self, default: T) -> T;
@@ -27,21 +27,6 @@ pub enum Unit {
 impl Default for Unit {
 	fn default() -> Self {
 		Unit::Undefined
-	}
-}
-
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct Layout {
-	pub location: Point,
-	pub size: Size,
-}
-
-impl Layout {
-	pub fn new() -> Self {
-		Layout {
-			location: Point::new(Unit::Undefined, Unit::Undefined),
-			size: Size::new(Unit::Undefined, Unit::Undefined),
-		}
 	}
 }
 

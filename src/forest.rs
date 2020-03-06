@@ -2,16 +2,16 @@ use crate::Error;
 use crate::geo::{Props, Point, OrElse};
 use crate::geo::Size;
 use crate::geo::Unit;
-use crate::geo::Layout;
+use crate::geo::Rect;
 use crate::geo::Number;
 use crate::Template;
 use crate::NodeId;
 
 pub(crate) struct NodeData {
 	pub(crate) props: Props,
-	pub(crate) layout: Layout,
+	pub(crate) layout: Rect,
 	pub(crate) template: Option<Template>,
-	pub(crate) layout_cache: Option<Cache>,
+//	pub(crate) layout_cache: Option<Cache>,
 	is_dirty: bool,
 }
 
@@ -19,9 +19,9 @@ impl NodeData {
 	fn new_leaf(props: Props) -> Self {
 		NodeData {
 			props,
-			layout: Layout::new(),
+			layout: Rect::new(Point::new(Unit::Undefined, Unit::Undefined), Size::new(Unit::Undefined, Unit::Undefined)),
 			template: None,
-			layout_cache: None,
+//			layout_cache: None,
 			is_dirty: true,
 		}
 	}
@@ -29,9 +29,9 @@ impl NodeData {
 	fn new(props: Props, template: Template) -> Self {
 		NodeData {
 			props,
-			layout: Layout::new(),
+			layout: Rect::new(Point::new(Unit::Undefined, Unit::Undefined), Size::new(Unit::Undefined, Unit::Undefined)),
 			template: Some(template),
-			layout_cache: None,
+//			layout_cache: None,
 			is_dirty: true,
 		}
 	}
@@ -172,7 +172,7 @@ impl Forest {
 	pub fn mark_dirty(&mut self, node: NodeId) {
 		fn mark_dirty_impl(nodes: &mut Vec<NodeData>, parents: &[Vec<NodeId>], node_id: NodeId) {
 			let node = &mut nodes[node_id];
-			node.layout_cache = None;
+//			node.layout_cache = None;
 			node.is_dirty = true;
 
 			for parent in &parents[node_id] {
@@ -183,21 +183,18 @@ impl Forest {
 		mark_dirty_impl(&mut self.nodes, &self.parents, node);
 	}
 
-	pub fn compute_layout(&mut self, node: NodeId, size: Size) -> Result<(), Error> {
-		self.compute(node, size, 0.0, 0.0)
+	pub fn compute_layout(&mut self, node: NodeId) -> Result<(), Error> {
+		let point = Point::new(Unit::Defined(0.0), Unit::Defined(0.0));
+		let size = Size::new(Unit::Defined(1.0), Unit::Defined(1.0));
+		let rect = Rect::new(point, size);
+		self.compute(node, rect).map(|_| ())
 	}
 }
 
 impl Forest {
-	pub(crate) fn compute(&mut self, root: NodeId, size: Size, x: Number, y: Number) -> Result<(), Error> {
-		if let Some(cache) = &self.nodes[root].layout_cache {
-			return todo!();
-		}
-
-		let children = &self.children[root];
-
-		if children.is_empty() {
-			let size = &self.nodes[root].props.size;
+	pub(crate) fn compute(&mut self, root: NodeId, rect: Rect) -> Result<Size, Error> {
+		if self.children[root].is_empty() {
+			let size = self.nodes[root].props.size;
 
 			if size.height == Unit::Undefined {
 				return Err(Error("Leaf node has no defined height.".into()));
@@ -206,47 +203,43 @@ impl Forest {
 				return Err(Error("Leaf node has no defined width.".into()));
 			}
 
-			self.nodes[root].layout = {
-				let mut layout = Layout::new();
-				layout.size = *size;
-				layout.location = Point::new(Unit::Defined(x), Unit::Defined(y));
-				layout
-			};
+			self.nodes[root].layout = Rect::new(rect.origin, size);
 
-			return Ok(());
+			return Ok(size);
 		}
 
 		let mut width = 0 as Number;
 		let mut height = 0 as Number;
 
-		for (rect, node_id) in self.nodes[root].template.as_ref().unwrap().iter()? {
-
+		let template = self.nodes[root].template.as_ref().unwrap();
+		let (template_width, template_height) = template.size;
+		for (rect, child_id) in template.iter()? {
 			println!("Child: {:?}", rect);
-			let x = x + rect.location.x.or_else(0.0);
-			let y = y + rect.location.y.or_else(0.0);
+//			let x = x + rect.location.x.or_else(0.0);
+//			let y = y + rect.location.y.or_else(0.0);
+//
+//			let node_width = rect.size.width.or_else(0.0).max(self.nodes[node_id].props.size.width.or_else(0.0));
+//			let node_height = rect.size.height.or_else(0.0).max(self.nodes[node_id].props.size.height.or_else(0.0));
+//
+//			let size = Size::new(Unit::Defined(node_width), Unit::Defined(node_height));
+//
+//			self.compute(node_id, size, x, y)?;
+//			let layout = self.nodes[node_id].layout;
+//			println!("Result: {:?}", layout);
 
-			let node_width = rect.size.width.or_else(0.0).max(self.nodes[node_id].props.size.width.or_else(0.0));
-			let node_height = rect.size.height.or_else(0.0).max(self.nodes[node_id].props.size.height.or_else(0.0));
-
-			let size = Size::new(Unit::Defined(node_width), Unit::Defined(node_height));
-
-			self.compute(node_id, size, x, y)?;
-			let layout = self.nodes[node_id].layout;
-			println!("Result: {:?}", layout);
-
-			width += node_width;
-			height += node_height;
+//			width += node_width;
+//			height += node_height;
 		}
 
-		self.nodes[root].layout = {
-			let mut layout = Layout::new();
-			layout.size = Size::new(Unit::Defined(width), Unit::Defined(height));
-			layout.location = Point::new(Unit::Defined(x), Unit::Defined(y));
-			println!("Nested: {:?}", layout);
-			layout
-		};
+//		self.nodes[root].layout = {
+//			let mut layout = Layout::new();
+//			layout.size = Size::new(Unit::Defined(width), Unit::Defined(height));
+//			layout.location = Point::new(Unit::Defined(x), Unit::Defined(y));
+//			println!("Nested: {:?}", layout);
+//			layout
+//		};
 
 
-		Ok(())
+		Ok(Size::new(Unit::Undefined, Unit::Undefined))
 	}
 }

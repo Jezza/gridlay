@@ -6,7 +6,7 @@ use std::sync::Mutex;
 use lazy_static::lazy_static;
 
 use crate::forest::Forest;
-use crate::geo::Layout;
+use crate::geo::{Layout, Rect};
 use crate::geo::Point;
 use crate::geo::Props;
 use crate::geo::Size;
@@ -136,7 +136,7 @@ impl GridLay {
 
 	pub fn compute_layout(&mut self, node: Node) -> Result<(), Error> {
 		let id = self.find_node(node)?;
-		self.forest.compute_layout(id, Size::new(Unit::Undefined, Unit::Undefined))
+		self.forest.compute_layout(id)
 	}
 }
 
@@ -380,9 +380,9 @@ impl Template {
 
 			let (x, y) = point!(index);
 
-			let mut layout = Layout::new();
-			layout.location = Point::new(Unit::Defined(x as f32), Unit::Defined(y as f32));
-			layout.size = Size::new(Unit::Defined(rect_width as f32), Unit::Defined(rect_height as f32));
+			let point = Point::new(Unit::Defined(x as f32), Unit::Defined(y as f32));
+			let size = Size::new(Unit::Defined(rect_width as f32), Unit::Defined(rect_height as f32));
+			let layout = Rect::new(point, size);
 
 			seen.push(*node);
 

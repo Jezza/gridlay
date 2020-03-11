@@ -213,8 +213,42 @@ impl Forest {
 
 		let template = self.nodes[root].template.as_ref().unwrap();
 		let (template_width, template_height) = template.size;
-		for (rect, child_id) in template.iter()? {
-			println!("Child: {:?}", rect);
+		for (child_rect, child_id) in template.iter()? {
+			println!("Child: {:?}", child_rect);
+
+			let origin = {
+				let origin = child_rect.origin;
+				let x = origin.x.or_else(0.0) / template_width as Number;
+				let y = origin.y.or_else(0.0) / template_height as Number;
+				Point::new(Unit::Defined(x), Unit::Defined(y))
+			};
+
+			let size = {
+				let size = {
+					let size = child_rect.size;
+					let width = size.width.or_else(0.0) / template_width as Number;
+					let height = size.height.or_else(0.0) / template_height as Number;
+					Size::new(Unit::Defined(width), Unit::Defined(height))
+				};
+				let point = {
+					let child_origin = child_rect.origin;
+					let origin = rect.origin;
+					let x = child_origin.x.or_else(0.0) * (1.0 - origin.x.or_else(0.0));
+					let y = child_origin.y.or_else(0.0) * (1.0 - origin.y.or_else(0.0));
+					Point::new(Unit::Defined(x), Unit::Defined(y))
+				};
+
+				let rect = Rect::new(point, size);
+				println!("Relative: {:?}", rect);
+				self.compute(child_id, rect)?
+			};
+
+			println!("{:?}", Rect::new(origin, size));
+
+//			Rect::new()
+
+//			self.compute(child_id, )
+
 //			let x = x + rect.location.x.or_else(0.0);
 //			let y = y + rect.location.y.or_else(0.0);
 //

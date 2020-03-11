@@ -6,18 +6,13 @@ pub fn main() {
 	let mut grid = GridLay::new();
 
 	let a = grid.new_leaf(Props::sized(2.0, 1.0));
-
-	{
-		grid.compute_layout(a).unwrap();
-		println!("{:#?}", grid.layout(a).unwrap());
-	}
-
-	let b = grid.new_leaf(Props::sized(1.0, 2.0));
+	let b = grid.new_leaf(Props::sized(1.0, 3.0));
 	let c = grid.new_leaf(Props::sized(1.0, 2.0));
+	let d = grid.new_leaf(Props::sized(1.0, 1.0));
 
 	let parent = grid.new_node(lines! {
-			a a;
-			b c;
+			a a a;
+			b c d;
 		}).unwrap();
 
 	grid.compute_layout(parent).unwrap();

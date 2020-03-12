@@ -97,6 +97,12 @@ impl GridLay {
 		}
 	}
 
+	pub fn debug(&mut self, node: Node, name: &'static str) -> Result<(), Error> {
+		let node = self.find_node(node)?;
+		self.forest.debug.insert(node, name);
+		Ok(())
+	}
+
 	pub fn new_leaf(&mut self, props: Props) -> Node {
 		let node = self.allocate_node();
 		let id = self.forest.new_leaf(props);

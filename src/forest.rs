@@ -6,6 +6,7 @@ use crate::geo::Rect;
 use crate::geo::Number;
 use crate::Template;
 use crate::NodeId;
+use std::collections::HashMap;
 
 pub(crate) struct NodeData {
 	pub(crate) props: Props,
@@ -43,6 +44,7 @@ pub(crate) struct Forest {
 	pub(crate) nodes: Vec<NodeData>,
 	pub(crate) children: Vec<Vec<NodeId>>,
 	pub(crate) parents: Vec<Vec<NodeId>>,
+	pub(crate) debug: HashMap<NodeId, &'static str>,
 }
 
 impl Forest {
@@ -51,6 +53,7 @@ impl Forest {
 			nodes: Vec::with_capacity(capacity),
 			children: Vec::with_capacity(capacity),
 			parents: Vec::with_capacity(capacity),
+			debug: HashMap::with_capacity(capacity),
 		}
 	}
 
@@ -208,42 +211,49 @@ impl Forest {
 			return Ok(size);
 		}
 
-		let mut width = 0 as Number;
-		let mut height = 0 as Number;
+		let mut width = 0f32;
+		let mut height = 0f32;
 
 		let template = self.nodes[root].template.as_ref().unwrap();
 		let (template_width, template_height) = template.size;
-		for (child_rect, child_id) in template.iter()? {
-			println!("Child: {:?}", child_rect);
+		for (template_rect, child_id) in template.iter()? {
+			println!();
+			let name = self.debug[&child_id];
+			println!("{} => Template({:?} at {:?})", name, template_rect.size, template_rect.origin);
 
-			let origin = {
-				let origin = child_rect.origin;
+			let relative_template_origin = {
+				let origin = template_rect.origin;
 				let x = origin.x.or_else(0.0) / template_width as Number;
 				let y = origin.y.or_else(0.0) / template_height as Number;
 				Point::new(Unit::Defined(x), Unit::Defined(y))
 			};
 
-			let size = {
-				let size = {
-					let size = child_rect.size;
-					let width = size.width.or_else(0.0) / template_width as Number;
-					let height = size.height.or_else(0.0) / template_height as Number;
-					Size::new(Unit::Defined(width), Unit::Defined(height))
-				};
-				let point = {
-					let child_origin = child_rect.origin;
-					let origin = rect.origin;
-					let x = child_origin.x.or_else(0.0) * (1.0 - origin.x.or_else(0.0));
-					let y = child_origin.y.or_else(0.0) * (1.0 - origin.y.or_else(0.0));
-					Point::new(Unit::Defined(x), Unit::Defined(y))
-				};
-
-				let rect = Rect::new(point, size);
-				println!("Relative: {:?}", rect);
-				self.compute(child_id, rect)?
+			let relative_template_size = {
+				let size = template_rect.size;
+				let width = size.width.or_else(0.0) / template_width as Number;
+				let height = size.height.or_else(0.0) / template_height as Number;
+				Size::new(Unit::Defined(width), Unit::Defined(height))
 			};
 
-			println!("{:?}", Rect::new(origin, size));
+			let relative_template_rect = Rect::new(relative_template_origin, relative_template_size);
+			println!("{} => RelativeTemplate({:?} at {:?})", name, relative_template_rect.size, relative_template_rect.origin);
+
+			let computed_size = {
+				let computed_size = self.compute(child_id, relative_template_rect)?;
+
+				println!("{} => ComputedSize({:?})", name, computed_size);
+
+				let height = template_rect.size.height.or_else(0.0).max(computed_size.height.or_else(0.0));
+				let width = template_rect.size.width.or_else(0.0).max(computed_size.width.or_else(0.0));
+				Size::new(Unit::Defined(width), Unit::Defined(height))
+			};
+
+			width = width.max(template_rect.origin.x.or_else(0.0) + computed_size.width.or_else(0.0));
+			height = height.max(template_rect.origin.y.or_else(0.0) + computed_size.height.or_else(0.0));
+
+			println!("{} => Result({:?} at {:?})", name, computed_size, relative_template_origin);
+
+			println!("Max({:?}, {:?})", width, height);
 
 //			Rect::new()
 
@@ -274,6 +284,6 @@ impl Forest {
 //		};
 
 
-		Ok(Size::new(Unit::Undefined, Unit::Undefined))
+		Ok(Size::new(Unit::Defined(width), Unit::Defined(height)))
 	}
 }

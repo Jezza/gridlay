@@ -6,11 +6,10 @@ use std::sync::Mutex;
 use lazy_static::lazy_static;
 
 use crate::forest::Forest;
-use crate::geo::{Layout, Rect};
+use crate::geo::{Rect, Number, Layout};
 use crate::geo::Point;
 use crate::geo::Props;
 use crate::geo::Size;
-use crate::geo::Unit;
 
 mod id;
 mod forest;
@@ -97,6 +96,14 @@ impl GridLay {
 		}
 	}
 
+	pub fn names(&self) -> &HashMap<NodeId, &'static str> {
+		&self.forest.debug
+	}
+
+	pub fn debug_name(&self, node: &NodeId) -> &'static str {
+		self.forest.debug[node]
+	}
+
 	pub fn debug(&mut self, node: Node, name: &'static str) -> Result<(), Error> {
 		let node = self.find_node(node)?;
 		self.forest.debug.insert(node, name);
@@ -135,12 +142,12 @@ impl GridLay {
 		Ok(self.forest.children[id].len())
 	}
 
-	pub fn layout(&self, node: Node) -> Result<&Layout, Error> {
-		let id = self.find_node(node)?;
-		Ok(&self.forest.nodes[id].layout)
-	}
+//	pub fn layout(&self, node: Node) -> Result<Option<&Rect>, Error> {
+//		let id = self.find_node(node)?;
+//		Ok(self.forest.nodes[id].layout.as_ref())
+//	}
 
-	pub fn compute_layout(&mut self, node: Node) -> Result<(), Error> {
+	pub fn compute_layout(&mut self, node: Node) -> Result<Layout, Error> {
 		let id = self.find_node(node)?;
 		self.forest.compute_layout(id)
 	}
@@ -316,7 +323,7 @@ impl Template {
 		children
 	}
 
-	fn iter(&self) -> Result<impl Iterator<Item = (Layout, NodeId)>, Error> {
+	fn iter(&self) -> Result<impl Iterator<Item = (Rect, NodeId)>, Error> {
 
 		let (width, height) = self.size;
 
@@ -386,8 +393,8 @@ impl Template {
 
 			let (x, y) = point!(index);
 
-			let point = Point::new(Unit::Defined(x as f32), Unit::Defined(y as f32));
-			let size = Size::new(Unit::Defined(rect_width as f32), Unit::Defined(rect_height as f32));
+			let point = Point::new(x as Number, y as Number);
+			let size = Size::new(rect_width as Number, rect_height as Number);
 			let layout = Rect::new(point, size);
 
 			seen.push(*node);

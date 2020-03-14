@@ -1,64 +1,47 @@
-use std::fmt::{Debug, Formatter, Error};
+use std::fmt::{Debug, Error, Formatter};
+use std::collections::HashMap;
+use crate::NodeId;
 
-pub type Size = euclid::default::Size2D<Unit>;
-pub type Point = euclid::default::Point2D<Unit>;
-pub type Rect = euclid::default::Rect<Unit>;
-pub type Layout = Rect;
-
-pub trait OrElse<T> {
-	fn or_else(&self, default: T) -> T;
-}
-
-impl OrElse<f32> for Unit {
-	fn or_else(&self, default: f32) -> f32 {
-		match self {
-			Unit::Defined(value) => *value,
-			_ => default,
-		}
-	}
-}
+pub type Size = euclid::default::Size2D<Number>;
+pub type Point = euclid::default::Point2D<Number>;
+pub type Rect = euclid::default::Rect<Number>;
 
 pub type Number = f32;
 
-#[derive(Clone, Copy, PartialEq)]
-pub enum Unit {
-	Defined(Number),
-	Undefined,
+pub trait RectExt {
+	fn relativise(&self, x: Number, y: Number) -> Self;
 }
 
-impl Debug for Unit {
-	fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-		match self {
-			Unit::Undefined => f.write_str("N/A"),
-			Unit::Defined(number) => f.write_str(&format!("{}", number))
-		}
+impl RectExt for Rect {
+	fn relativise(&self, x: Number, y: Number) -> Rect {
+		Rect::new(
+			Point::new(self.origin.x / x, self.origin.y / y),
+			Size::new(self.size.width / x, self.size.height / y),
+		)
 	}
 }
 
-impl Default for Unit {
-	fn default() -> Self {
-		Unit::Undefined
-	}
+#[derive(Clone, Debug)]
+pub struct Layout {
+	pub size: Size,
+	pub table: HashMap<NodeId, Rect>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Props {
-	pub location: Point,
-	pub size: Size,
+	pub size: Option<Size>,
 }
 
 impl Props {
 	pub fn sized(width: Number, height: Number) -> Props {
 		Props {
-			location: Point::new(Unit::Undefined, Unit::Undefined),
-			size: Size::new(Unit::Defined(width), Unit::Defined(height)),
+			size: Some(Size::new(width, height)),
 		}
 	}
 
 	pub fn undefined() -> Props {
 		Props {
-			location: Point::new(Unit::Undefined, Unit::Undefined),
-			size: Size::new(Unit::Undefined, Unit::Undefined),
+			size: None,
 		}
 	}
 }

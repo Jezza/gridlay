@@ -1,7 +1,8 @@
 use crate::Error;
-use crate::geo::{Props, Point, OrElse};
+use crate::geo::{Props, Layout};
+use crate::geo::Point;
+use crate::geo::RectExt;
 use crate::geo::Size;
-use crate::geo::Unit;
 use crate::geo::Rect;
 use crate::geo::Number;
 use crate::Template;
@@ -10,7 +11,7 @@ use std::collections::HashMap;
 
 pub(crate) struct NodeData {
 	pub(crate) props: Props,
-	pub(crate) layout: Rect,
+//	pub(crate) layout: Option<Rect>,
 	pub(crate) template: Option<Template>,
 //	pub(crate) layout_cache: Option<Cache>,
 	is_dirty: bool,
@@ -20,7 +21,7 @@ impl NodeData {
 	fn new_leaf(props: Props) -> Self {
 		NodeData {
 			props,
-			layout: Rect::new(Point::new(Unit::Undefined, Unit::Undefined), Size::new(Unit::Undefined, Unit::Undefined)),
+//			layout: None,
 			template: None,
 //			layout_cache: None,
 			is_dirty: true,
@@ -30,7 +31,7 @@ impl NodeData {
 	fn new(props: Props, template: Template) -> Self {
 		NodeData {
 			props,
-			layout: Rect::new(Point::new(Unit::Undefined, Unit::Undefined), Size::new(Unit::Undefined, Unit::Undefined)),
+//			layout: None,
 			template: Some(template),
 //			layout_cache: None,
 			is_dirty: true,
@@ -186,104 +187,95 @@ impl Forest {
 		mark_dirty_impl(&mut self.nodes, &self.parents, node);
 	}
 
-	pub fn compute_layout(&mut self, node: NodeId) -> Result<(), Error> {
-		let point = Point::new(Unit::Defined(0.0), Unit::Defined(0.0));
-		let size = Size::new(Unit::Defined(1.0), Unit::Defined(1.0));
-		let rect = Rect::new(point, size);
-		self.compute(node, rect).map(|_| ())
+	pub fn compute_layout(&mut self, node: NodeId) -> Result<Layout, Error> {
+//		let point = Point::new(0 as Number, 0 as Number);
+//		let size = Size::new(1 as Number, 1 as Number);
+//		let rect = Rect::new(point, size);
+
+		let (size, mut table) = self.compute(node)?;
+		let width = size.width;
+		let height = size.height;
+
+		table.iter_mut()
+			.for_each(|(_, rect)| *rect = rect.scale(width, height));
+
+//		for (node_id, rect) in table.iter_mut() {
+//			*rect = rect.scale(width, height);
+//		}
+		for (node_id, name) in self.debug.iter() {
+			if table.contains_key(node_id) {
+				println!("{} = {}", node_id, name);
+			}
+		}
+		println!("Absolute => {:#?}", table);
+
+		Ok(Layout {
+			size,
+			table,
+		})
 	}
 }
 
 impl Forest {
-	pub(crate) fn compute(&mut self, root: NodeId, rect: Rect) -> Result<Size, Error> {
+	pub(crate) fn compute(&mut self, root: NodeId) -> Result<(Size, HashMap<NodeId, Rect>), Error> {
 		if self.children[root].is_empty() {
-			let size = self.nodes[root].props.size;
-
-			if size.height == Unit::Undefined {
-				return Err(Error("Leaf node has no defined height.".into()));
-			}
-			if size.width == Unit::Undefined {
-				return Err(Error("Leaf node has no defined width.".into()));
-			}
-
-			self.nodes[root].layout = Rect::new(rect.origin, size);
-
-			return Ok(size);
+			let size = self.nodes[root].props.size
+				.ok_or_else(|| Error("Leaf node has no defined size.".into()))?;
+			return Ok((size, HashMap::new()));
 		}
 
-		let mut width = 0f32;
-		let mut height = 0f32;
+		let mut width = 0 as Number;
+		let mut height = 0 as Number;
+		let mut table = HashMap::new();
 
 		let template = self.nodes[root].template.as_ref().unwrap();
 		let (template_width, template_height) = template.size;
 		for (template_rect, child_id) in template.iter()? {
-			println!();
 			let name = self.debug[&child_id];
+
+			println!();
 			println!("{} => Template({:?} at {:?})", name, template_rect.size, template_rect.origin);
 
-			let relative_template_origin = {
-				let origin = template_rect.origin;
-				let x = origin.x.or_else(0.0) / template_width as Number;
-				let y = origin.y.or_else(0.0) / template_height as Number;
-				Point::new(Unit::Defined(x), Unit::Defined(y))
-			};
-
-			let relative_template_size = {
-				let size = template_rect.size;
-				let width = size.width.or_else(0.0) / template_width as Number;
-				let height = size.height.or_else(0.0) / template_height as Number;
-				Size::new(Unit::Defined(width), Unit::Defined(height))
-			};
-
-			let relative_template_rect = Rect::new(relative_template_origin, relative_template_size);
-			println!("{} => RelativeTemplate({:?} at {:?})", name, relative_template_rect.size, relative_template_rect.origin);
+			let relative_rect = template_rect.relativise(template_width as Number, template_height as Number);
+			println!("{} => RelativeTemplate({:?} at {:?})", name, relative_rect.size, relative_rect.origin);
 
 			let computed_size = {
-				let computed_size = self.compute(child_id, relative_template_rect)?;
+				let (computed_size, mut relative_table) = self.compute(child_id)?;
 
-				println!("{} => ComputedSize({:?})", name, computed_size);
+				if relative_table.is_empty() {
+					table.insert(child_id, relative_rect);
+				} else {
+					for (node_id, relative) in relative_table.iter_mut() {
+						relative.size = {
+							Size::new(
+								relative.size.width * relative_rect.size.width,
+								relative.size.height * relative_rect.size.height,
+							)
+						};
 
-				let height = template_rect.size.height.or_else(0.0).max(computed_size.height.or_else(0.0));
-				let width = template_rect.size.width.or_else(0.0).max(computed_size.width.or_else(0.0));
-				Size::new(Unit::Defined(width), Unit::Defined(height))
+						relative.origin = {
+							Point::new(
+								relative_rect.origin.x + (relative.origin.x * relative_rect.size.width),
+								relative_rect.origin.y + (relative.origin.y * relative_rect.size.height),
+							)
+						};
+					}
+
+					table.extend(relative_table);
+				}
+
+//				template_rect.size.max(computed_size)
+				computed_size
 			};
 
-			width = width.max(template_rect.origin.x.or_else(0.0) + computed_size.width.or_else(0.0));
-			height = height.max(template_rect.origin.y.or_else(0.0) + computed_size.height.or_else(0.0));
+			width = width.max(computed_size.width * (1 as Number / relative_rect.size.width));
+			height = height.max(computed_size.height * (1 as Number / relative_rect.size.height));
 
-			println!("{} => Result({:?} at {:?})", name, computed_size, relative_template_origin);
-
-			println!("Max({:?}, {:?})", width, height);
-
-//			Rect::new()
-
-//			self.compute(child_id, )
-
-//			let x = x + rect.location.x.or_else(0.0);
-//			let y = y + rect.location.y.or_else(0.0);
-//
-//			let node_width = rect.size.width.or_else(0.0).max(self.nodes[node_id].props.size.width.or_else(0.0));
-//			let node_height = rect.size.height.or_else(0.0).max(self.nodes[node_id].props.size.height.or_else(0.0));
-//
-//			let size = Size::new(Unit::Defined(node_width), Unit::Defined(node_height));
-//
-//			self.compute(node_id, size, x, y)?;
-//			let layout = self.nodes[node_id].layout;
-//			println!("Result: {:?}", layout);
-
-//			width += node_width;
-//			height += node_height;
+			println!("{} => Result({:?} at {:?})", name, computed_size, relative_rect.origin);
 		}
 
-//		self.nodes[root].layout = {
-//			let mut layout = Layout::new();
-//			layout.size = Size::new(Unit::Defined(width), Unit::Defined(height));
-//			layout.location = Point::new(Unit::Defined(x), Unit::Defined(y));
-//			println!("Nested: {:?}", layout);
-//			layout
-//		};
+		println!("({:?}, {:?}) => {:#?}", width, height, table);
 
-
-		Ok(Size::new(Unit::Defined(width), Unit::Defined(height)))
+		Ok((Size::new(width, height), table))
 	}
 }

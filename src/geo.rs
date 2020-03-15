@@ -1,6 +1,5 @@
-use std::fmt::{Debug, Error, Formatter};
-use std::collections::HashMap;
-use crate::NodeId;
+use std::fmt::{Debug};
+use crate::Node;
 
 pub type Size = euclid::default::Size2D<Number>;
 pub type Point = euclid::default::Point2D<Number>;
@@ -24,24 +23,18 @@ impl RectExt for Rect {
 #[derive(Clone, Debug)]
 pub struct Layout {
 	pub size: Size,
-	pub table: HashMap<NodeId, Rect>,
+	pub table: Vec<(Node, Rect)>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Props {
-	pub size: Option<Size>,
+	pub size: Size,
 }
 
 impl Props {
 	pub fn sized(width: Number, height: Number) -> Props {
 		Props {
-			size: Some(Size::new(width, height)),
-		}
-	}
-
-	pub fn undefined() -> Props {
-		Props {
-			size: None,
+			size: Size::new(width, height),
 		}
 	}
 }

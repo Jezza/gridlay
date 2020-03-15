@@ -19,7 +19,10 @@ pub(crate) struct Allocator {
 
 impl Allocator {
 	pub fn new() -> Self {
-		Allocator { new_id: atomic::AtomicU32::new(0), free_ids: spin::RwLock::new(IdCache::default()) }
+		Allocator {
+			new_id: atomic::AtomicU32::new(0),
+			free_ids: spin::RwLock::new(IdCache::default()),
+		}
 	}
 
 	pub fn allocate(&self) -> Id {
